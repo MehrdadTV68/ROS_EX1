@@ -1,0 +1,75 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="des_x" default="3.0" />
+    <arg name="des_y"  default="3.0" />
+    <param name="des_pos_x" value="$(arg des_x)" />
+    <param name="des_pos_y" value="$(arg des_y)" />
+
+
+	<!-- these are the arguments you can pass this launch file, for example paused:=true -->
+	<arg name="paused" default="false"/>
+	<arg name="use_sim_time" default="true"/>
+	<arg name="extra_gazebo_args" default=""/>
+	<arg name="gui" default="true"/>
+	<arg name="recording" default="false"/>
+	<arg name="world" default="world02" />
+
+	<arg name="headless" default="false"/>
+	<arg name="debug" default="false"/>
+	<arg name="physics" default="ode"/>
+	<arg name="verbose" default="false"/>
+	<arg name="world_name" value="$(find robot_description)/worlds/$(arg world).world"/>
+	<arg name="respawn_gazebo" default="false"/>
+	<arg name="use_clock_frequency" default="false"/>
+	<arg name="pub_clock_frequency" default="100"/>
+
+	<!-- set use_sim_time flag -->
+	<param name="/use_sim_time" value="$(arg use_sim_time)"/>
+
+	<!-- set command arguments -->
+	<arg unless="$(arg paused)" name="command_arg1" value=""/>
+	<arg     if="$(arg paused)" name="command_arg1" value="-u"/>
+	<arg unless="$(arg recording)" name="command_arg2" value=""/>
+	<arg     if="$(arg recording)" name="command_arg2" value="-r"/>
+	<arg unless="$(arg verbose)" name="command_arg3" value=""/>
+	<arg     if="$(arg verbose)" name="command_arg3" value="--verbose"/>
+	<arg unless="$(arg debug)" name="script_type" value="gzserver"/>
+	<arg     if="$(arg debug)" name="script_type" value="debug"/>
+
+	<!-- start gazebo server-->
+	<group if="$(arg use_clock_frequency)">
+		<param name="gazebo/pub_clock_frequency" value="$(arg pub_clock_frequency)" />
+	</group>
+
+	<node name="gazebo" pkg="gazebo_ros" type="$(arg script_type)" respawn="$(arg respawn_gazebo)" output="screen"
+	args="$(arg command_arg1) $(arg command_arg2) $(arg command_arg3) -e $(arg physics) $(arg extra_gazebo_args) $(arg world_name)" />
+
+	<!-- start gazebo client -->
+	<group if="$(arg gui)">
+		<node name="gazebo_gui" pkg="gazebo_ros" type="gzclient" respawn="false" output="screen"/>
+	</group>
+
+	<!-- these are the arguments you can pass this launch file, for example paused:=true -->
+	<arg name="model" default="$(find robot_description)/urdf/robot2_laser.xacro" />
+
+	<!-- Load the URDF into the ROS Parameter Server -->
+	<param name="robot_description" 
+	 command="$(find xacro)/xacro --inorder $(arg model)" />
+
+	<!-- Run a python script to the send a service call to gazebo_ros to spawn a URDF robot -->
+	<node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen"
+	 args="-urdf -model robot1 -param robot_description -y 1.0 -z 0.05"/> 
+
+
+	    <!-- Start User Interface Controller (using keyboard) -->
+	    <!--node pkg="rqt_robot_steering" type="rqt_robot_steering" name="rqt_robot_steering" /-->
+
+    <!-- run services -->
+	<node pkg="robot_description" type="random_position_generator_service.py" name="random_position_generator_service" output="screen" />
+    <node pkg="robot_description" type="wall_follow_service.py" name="wall_follower" output="screen" />
+    <node pkg="robot_description" type="go_to_point_service.py" name="go_to_point" output="screen" />
+    <node pkg="robot_description" type="user_input.py" name="user_input" output="screen" />
+
+    <!-- run controller -->
+    <node pkg="robot_description" type="bug.py" name="bug" output="screen" />
+</launch>
